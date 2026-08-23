@@ -19,7 +19,7 @@
 
 import { unlink } from "fs/promises";
 import { existsSync } from "fs";
-import { randomBytes } from "crypto";
+import { createHash } from "crypto";
 import { isSafeFilenameComponent } from "../profile/identity.js";
 import { atomicWrite } from "../utils/markdown.js";
 import { moveCandidateToArchive } from "../utils/candidate-store.js";
@@ -117,10 +117,31 @@ export interface CandidateDraft {
   trustDecision?: TrustDecision;
 }
 
-/** Build a deterministic-but-unique id from a slug and a short random suffix. */
-function buildCandidateId(slug: string): string {
-  const suffix = randomBytes(ID_SUFFIX_BYTES).toString("hex");
-  return `${slug}-${suffix}`;
+/**
+ * Build a candidate id from its slug and a suffix derived from its content.
+ *
+ * The suffix used to be `randomBytes`, under a comment calling the result
+ * deterministic. It was not: compiling the same sources against the same model
+ * responses twice produced two candidate files whose names differed, which is
+ * enough on its own to make a compile unreproducible and to make a recorded pass
+ * and a replayed pass impossible to compare.
+ *
+ * Deriving it from the content keeps what the suffix was for — two candidates
+ * with the same slug and different content still get different ids — and adds
+ * what was missing: the same candidate is the same file. Identical content now
+ * collapses onto one id, which is correct, because two candidates that agree in
+ * every field are the same candidate.
+ */
+function buildCandidateId(draft: CandidateDraft): string {
+  const identity = JSON.stringify({
+    title: draft.title,
+    slug: draft.slug,
+    summary: draft.summary,
+    sources: draft.sources,
+    body: draft.body,
+  });
+  const suffix = createHash("sha256").update(identity).digest("hex").slice(0, ID_SUFFIX_BYTES * 2);
+  return `${draft.slug}-${suffix}`;
 }
 
 /**
@@ -159,7 +180,7 @@ export async function writeCandidate(
 ): Promise<ReviewCandidate> {
   if (!isSafeFilenameComponent(draft.slug)) throw new UnsafeCandidateIdError("slug", draft.slug);
   const { canonicalId, duplicateIds } = await findIdentityDuplicates(root, candidateTargetKey(draft));
-  const candidate = buildCandidate(draft, canonicalId ?? buildCandidateId(draft.slug));
+  const candidate = buildCandidate(draft, canonicalId ?? buildCandidateId(draft));
 
   await atomicWrite(await candidatePath(root, candidate.id), JSON.stringify(candidate, null, 2));
   await deleteDuplicates(root, duplicateIds);
@@ -172,7 +193,7 @@ export async function writeFreshCandidate(
   draft: CandidateDraft,
 ): Promise<ReviewCandidate> {
   if (!isSafeFilenameComponent(draft.slug)) throw new UnsafeCandidateIdError("slug", draft.slug);
-  const candidate: ReviewCandidate = buildCandidate(draft, buildCandidateId(draft.slug));
+  const candidate: ReviewCandidate = buildCandidate(draft, buildCandidateId(draft));
   await atomicWrite(await candidatePath(root, candidate.id), JSON.stringify(candidate, null, 2));
   return candidate;
 }
