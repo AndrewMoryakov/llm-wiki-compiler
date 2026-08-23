@@ -43,6 +43,7 @@ import {
 import { candidateFileId } from "../utils/candidate-store.js";
 import { createHash } from "node:crypto";
 import type { EvidenceRef, RuleCandidate, RuleProvenance } from "../utils/rule-types.js";
+import { nowIso } from "../utils/clock.js";
 
 /** Producer tag stamped on every candidate's provenance. */
 const PROVENANCE_SOURCE = "llm-wiki-compiler";
@@ -200,7 +201,7 @@ async function changedSources(root: string): Promise<string[]> {
  */
 export async function extractRuleCandidates(
   root: string,
-  createdAt: string = new Date().toISOString(),
+  createdAt: string = nowIso(),
 ): Promise<RuleExtractionResult> {
   const provenance = buildProvenance();
   const sources = await changedSources(root);

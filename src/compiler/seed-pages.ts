@@ -30,6 +30,7 @@ import * as output from "../utils/output.js";
 import { CONCEPTS_DIR } from "../utils/constants.js";
 import type { WikiFrontmatter } from "../utils/types.js";
 import type { PageGenerationResult } from "./types.js";
+import { nowIso } from "../utils/clock.js";
 
 /**
  * Materialise schema-declared seed pages (overview, comparison, entity).
@@ -146,7 +147,7 @@ async function generateSingleSeedPage(
     messages: [{ role: "user", content: `Write the ${seed.kind} page titled "${seed.title}".` }],
   });
 
-  const now = new Date().toISOString();
+  const now = nowIso();
   const existing = await readWikiPageContentOrWarn(
     root, CONCEPTS_DIR, slug, false /* first compile — absence is normal */,
   );

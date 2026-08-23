@@ -20,6 +20,7 @@ import { slugify } from "../utils/markdown.js";
 import { SOURCES_DIR } from "../utils/constants.js";
 import type { ExtractionResult } from "./deps.js";
 import type { SourceState } from "../utils/types.js";
+import { nowIso } from "../utils/clock.js";
 
 /**
  * Compute a per-source state snapshot keyed by source filename.
@@ -39,7 +40,7 @@ export async function buildExtractionSourceStates(
   extractions: ExtractionResult[],
 ): Promise<Record<string, SourceState>> {
   const snapshot: Record<string, SourceState> = {};
-  const compiledAt = new Date().toISOString();
+  const compiledAt = nowIso();
 
   for (const result of extractions) {
     if (result.concepts.length === 0) continue;

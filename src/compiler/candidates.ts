@@ -34,6 +34,7 @@ import type { HeldReason, ReviewMode } from "../review/policy.js";
 import type { LintResult } from "../linter/types.js";
 import type { TrustDecision } from "../trust/decision.js";
 import type { ConnectorProvenance } from "../connectors/types.js";
+import { nowIso } from "../utils/clock.js";
 
 // Re-export the read/list/sanitize half and shared path symbols so every
 // existing importer of `candidates.ts` keeps working without churn.
@@ -185,7 +186,7 @@ function buildCandidate(draft: CandidateDraft, id: string): ReviewCandidate {
     summary: draft.summary,
     sources: draft.sources,
     body: draft.body,
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     reviewMode: draft.reviewMode ?? "forced",
     heldReasons: draft.heldReasons ?? DEFAULT_HELD_REASONS,
   };

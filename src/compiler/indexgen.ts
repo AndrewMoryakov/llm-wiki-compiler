@@ -16,6 +16,7 @@ import * as output from "../utils/output.js";
 import type { PageSummary } from "../utils/types.js";
 import { loadNonDefaultProfile, collectEntityPagesWithMessages } from "../profile/block.js";
 import type { EntityPage } from "../profile/types.js";
+import { nowIso } from "../utils/clock.js";
 
 /**
  * Generate the wiki/index.md listing all concept pages with summaries.
@@ -160,7 +161,7 @@ function buildIndexContent(
   // entityPages is empty for DEFAULT projects, keeping that footer byte-identical.
   const total = concepts.length + queries.length + entityPages.length;
   lines.push("");
-  lines.push(`_${total} pages | Generated ${new Date().toISOString()}_`);
+  lines.push(`_${total} pages | Generated ${nowIso()}_`);
   lines.push("");
 
   return lines.join("\n");

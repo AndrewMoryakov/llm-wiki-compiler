@@ -16,6 +16,7 @@ import { slugify } from "../utils/markdown.js";
 import * as output from "../utils/output.js";
 import type { WikiState, SourceChange, ExtractedConcept } from "../utils/types.js";
 import type { CompileStateDraft } from "./compile-state-draft.js";
+import { nowIso } from "../utils/clock.js";
 
 export interface ExtractionResult {
   sourceFile: string;
@@ -328,7 +329,7 @@ export function freezeFailedExtractions(
     draft.setSource(result.sourceFile, {
       hash: "",
       concepts: oldConcepts,
-      compiledAt: new Date().toISOString(),
+      compiledAt: nowIso(),
     });
   }
 }

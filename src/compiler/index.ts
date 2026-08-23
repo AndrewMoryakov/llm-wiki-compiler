@@ -81,6 +81,7 @@ import type {
   SourceChange,
   SourceState,
 } from "../utils/types.js";
+import { nowIso } from "../utils/clock.js";
 
 /** Empty CompileResult used when no pipeline work runs (e.g. lock contention). */
 function emptyCompileResult(): CompileResult {
@@ -278,7 +279,7 @@ async function persistSourceStateFiltered(
   const entry: SourceState = {
     hash,
     concepts: concepts.map((c) => slugify(c.concept)).filter((s) => liveSlugs.has(s)),
-    compiledAt: new Date().toISOString(),
+    compiledAt: nowIso(),
   };
   draft.setSource(sourceFile, entry);
 }

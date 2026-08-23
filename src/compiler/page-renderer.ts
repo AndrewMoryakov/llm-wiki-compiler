@@ -23,6 +23,7 @@ import { normalizeCitationsInBody } from "./citation-normalize.js";
 import { CONCEPTS_DIR } from "../utils/constants.js";
 import type { SchemaConfig } from "../schema/index.js";
 import type { ExtractedConcept } from "../utils/types.js";
+import { nowIso } from "../utils/clock.js";
 
 /** Maximum number of existing concept pages to include as cross-reference context. */
 const RELATED_PAGE_CONTEXT_LIMIT = 5;
@@ -83,7 +84,7 @@ function buildMergedFrontmatter(
   existingPage: string,
   schema: SchemaConfig,
 ): string {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const existing = existingPage ? parseFrontmatter(existingPage) : null;
   const createdAt = (existing?.meta.createdAt && typeof existing.meta.createdAt === "string")
     ? existing.meta.createdAt
