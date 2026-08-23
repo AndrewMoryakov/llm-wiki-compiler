@@ -20,6 +20,7 @@ import { OllamaProvider } from "../providers/ollama.js";
 import { MiniMaxProvider } from "../providers/minimax.js";
 import { CopilotProvider } from "../providers/copilot.js";
 import { ClaudeAgentProvider } from "../providers/claude-agent.js";
+import { getRecordingProvider, getReplayProvider } from "../providers/replay.js";
 import {
   AtlasCloudProvider,
   resolveAtlasCloudApiKeyFromEnv,
@@ -112,6 +113,10 @@ export function buildProvider(providerName: string): LLMProvider {
       return getCopilotProvider();
     case "atlascloud":
       return getAtlasCloudProvider();
+    case "record":
+      return getRecordingProvider(buildProvider);
+    case "replay":
+      return getReplayProvider();
     default:
       throw new Error(`Unhandled provider: ${providerName}`);
   }
@@ -228,6 +233,18 @@ export function resolveActiveModelId(): string {
   }
   if (providerName === "claude-agent") {
     return resolveAnthropicModelFromEnv() ?? PROVIDER_MODELS["claude-agent"];
+  }
+  if (providerName === "record") {
+    // A recording pass has the model identity of the provider it wraps; "record"
+    // is a wrapper, not a backend, and reporting it as the model would put a
+    // meaningless value into provenance.
+    const recorded = normalizeProviderName(process.env.LLMWIKI_RECORD_PROVIDER?.trim() || "anthropic");
+    return process.env.LLMWIKI_MODEL ?? PROVIDER_MODELS[recorded] ?? recorded;
+  }
+  if (providerName === "replay") {
+    // Replay runs no model at all. The identity that produced the text lives in
+    // the recording, and claiming one here would be a fabricated provenance.
+    return "replay";
   }
   return getModelForProvider(
     providerName as "openai" | "ollama" | "minimax" | "copilot" | "atlascloud",

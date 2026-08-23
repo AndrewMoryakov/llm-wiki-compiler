@@ -77,6 +77,10 @@ export const SUPPORTED_PROVIDER_INPUTS = [
   "atlascloud",
   "atlas-cloud",
   "atlas",
+  // Not backends of their own: "record" wraps another provider and writes every
+  // exchange down, "replay" serves those recordings with no network at all.
+  "record",
+  "replay",
 ] as const;
 
 /** Normalize accepted LLMWIKI_PROVIDER aliases to provider implementation names. */
