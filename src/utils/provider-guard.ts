@@ -58,6 +58,11 @@ const PROVIDER_KEY_VARS: Record<string, string | readonly string[] | null> = {
   minimax: "MINIMAX_API_KEY",
   copilot: "GITHUB_TOKEN",
   atlascloud: ATLASCLOUD_API_KEY_ENV_VARS,
+  // Wrappers rather than backends: "record" delegates to the provider named by
+  // LLMWIKI_RECORD_PROVIDER, whose own credential requirement is checked when it is
+  // built, and "replay" reaches nothing at all.
+  record: null,
+  replay: null,
 };
 
 /** One-or-many credential names as a list, so the check has a single shape. */
