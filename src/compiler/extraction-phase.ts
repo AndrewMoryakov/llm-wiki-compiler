@@ -22,6 +22,7 @@ import {
   buildExtractionPrompt,
   parseConcepts,
 } from "./prompts.js";
+import { sourceBody } from "./prompt-budget.js";
 import {
   findLateAffectedSources,
   type ExtractionResult,
@@ -147,7 +148,8 @@ async function extractConcepts(
   sourceContent: string,
   existingIndex: string,
 ): Promise<ExtractedConcept[]> {
-  const system = buildExtractionPrompt(sourceContent, existingIndex);
+  // Only the body: frontmatter is producer metadata, not something to extract from.
+  const system = buildExtractionPrompt(sourceBody(sourceContent).text, existingIndex);
   const rawOutput = await callClaude({
     system,
     messages: [{ role: "user", content: "Extract the key concepts from this source." }],

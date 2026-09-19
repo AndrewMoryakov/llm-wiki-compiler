@@ -11,9 +11,13 @@
  * The fix is deliberately defensive (proportional truncation) rather than
  * smart (semantic ranking / summarisation). It prevents crashes while a
  * deeper retrieval-driven solution is designed.
+ *
+ * Every source reaches the model as its body only, numbered with the source
+ * file's own line numbers (see {@link sourceBody}).
  */
 
 import * as output from "../utils/output.js";
+import { parseFrontmatter } from "../utils/markdown.js";
 import {
   DEFAULT_PROMPT_BUDGET_CHARS,
   PROMPT_BUDGET_ENV_VAR,
@@ -28,6 +32,44 @@ export interface SourceSlice {
   file: string;
   /** Raw extracted source content, before any budgeting. */
   content: string;
+}
+
+/** A source slice reduced to its body, remembering where that body starts in the file. */
+interface BodySlice extends SourceSlice {
+  /** Whole-file line number of the body's first line. */
+  firstLine: number;
+}
+
+/** A source's body and the whole-file line number of its first line. */
+export interface SourceBody {
+  /** Everything after the closing `---` of the frontmatter, or the whole source without one. */
+  text: string;
+  /** 1-based line of `text`'s first line within the source file. */
+  firstLine: number;
+}
+
+/**
+ * Split a source into the body the model may read and the line that body starts on.
+ *
+ * Frontmatter is metadata written by whatever produced the source, not evidence.
+ * Shown to the model it gets cited (`^[doc.md:2-5]` pointing at `title:` lines) and
+ * extracted as concepts about the header. The body keeps its whole-file numbering
+ * because provenance, eval and the broken-citation linter read a cited range as
+ * lines of the whole file.
+ *
+ * @param raw - The source file's full text.
+ * @returns The body text and its first line's whole-file number.
+ */
+export function sourceBody(raw: string): SourceBody {
+  const { body } = parseFrontmatter(raw);
+  const header = raw.slice(0, raw.length - body.length);
+  return { text: body, firstLine: header.split("\n").length };
+}
+
+/** Reduce a slice to its body, keeping the file name and the body's first line. */
+function toBodySlice(slice: SourceSlice): BodySlice {
+  const { text, firstLine } = sourceBody(slice.content);
+  return { file: slice.file, content: text, firstLine };
 }
 
 /**
@@ -60,17 +102,18 @@ export function buildBudgetedCombinedContent(
   concept: string,
   slices: SourceSlice[],
 ): string {
+  const bodies = slices.map(toBodySlice);
   const budget = resolvePromptBudgetChars();
-  const totalRaw = slices.reduce((sum, s) => sum + s.content.length, 0);
+  const totalRaw = bodies.reduce((sum, s) => sum + s.content.length, 0);
 
   if (totalRaw <= budget) {
-    return formatSlices(slices);
+    return formatSlices(bodies);
   }
 
-  const perSource = Math.max(1, Math.floor(budget / slices.length));
-  warnTruncation(concept, totalRaw, slices.length, perSource, budget);
+  const perSource = Math.max(1, Math.floor(budget / bodies.length));
+  warnTruncation(concept, totalRaw, bodies.length, perSource, budget);
 
-  const trimmed = slices.map((s) =>
+  const trimmed = bodies.map((s) =>
     s.content.length > perSource
       ? { ...s, content: s.content.slice(0, perSource) + TRUNCATION_MARKER }
       : s,
@@ -79,14 +122,15 @@ export function buildBudgetedCombinedContent(
 }
 
 /**
- * Prepend right-aligned 1-indexed line numbers to each line of source content.
- * Gives the LLM explicit anchors so its ^[file.md:N-M] citations are accurate.
+ * Prepend right-aligned line numbers, starting at `firstLine`, to each line of
+ * source content. Gives the LLM explicit anchors so its ^[file.md:N-M]
+ * citations are accurate, and numbers a body by its lines in the whole file.
  */
-function numberLines(content: string): string {
+function numberLines(content: string, firstLine: number): string {
   const lines = content.split("\n");
-  const width = String(lines.length).length;
+  const width = String(firstLine + lines.length - 1).length;
   return lines
-    .map((line, i) => `${String(i + 1).padStart(width)} | ${line}`)
+    .map((line, i) => `${String(firstLine + i).padStart(width)} | ${line}`)
     .join("\n");
 }
 
@@ -97,22 +141,23 @@ function numberLines(content: string): string {
  * extractor, which feeds one source per call rather than a merged concept.
  *
  * @param file - Source filename, for the truncation warning only.
- * @param content - Raw source content.
- * @returns Numbered (and, when over budget, truncated) content.
+ * @param content - Raw source content; only its body is rendered.
+ * @returns Numbered (and, when over budget, truncated) body.
  */
 export function budgetAndNumberSource(file: string, content: string): string {
+  const { text, firstLine } = sourceBody(content);
   const budget = resolvePromptBudgetChars();
-  if (content.length <= budget) {
-    return numberLines(content);
+  if (text.length <= budget) {
+    return numberLines(text, firstLine);
   }
-  warnTruncation(file, content.length, 1, budget, budget);
-  return numberLines(content.slice(0, budget) + TRUNCATION_MARKER);
+  warnTruncation(file, text.length, 1, budget, budget);
+  return numberLines(text.slice(0, budget) + TRUNCATION_MARKER, firstLine);
 }
 
 /** Render the slice list using the same `--- SOURCE: ---` headers the LLM is taught to read. */
-function formatSlices(slices: SourceSlice[]): string {
+function formatSlices(slices: BodySlice[]): string {
   return slices
-    .map((s) => `--- SOURCE: ${s.file} ---\n\n${numberLines(s.content)}`)
+    .map((s) => `--- SOURCE: ${s.file} ---\n\n${numberLines(s.content, s.firstLine)}`)
     .join("\n\n");
 }
 
