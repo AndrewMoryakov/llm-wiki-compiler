@@ -77,3 +77,28 @@ describe("compile prompts", () => {
     expect(prompts.join("\n")).toContain("first body line");
   });
 });
+
+describe("a final newline", () => {
+  // A newline at the end of a file ends its last line; it does not begin another.
+  // Split on "\n", it leaves an empty tail, and numbering that tail showed the model
+  // a line the file does not have — which the model then cited (^[doc.md:7-8] for a
+  // one-line body), and a consumer that counts lines the POSIX way refused.
+  it("does not show a line after the last one", () => {
+    const shown = numberedLines(budgetAndNumberSource("doc.md", `${HEADER}only body line\n`));
+    expect(shown).toEqual([[7, "only body line"]]);
+  });
+
+  it("does not show it in combined page-generation content either", () => {
+    const combined = buildBudgetedCombinedContent("Concept", [{ file: "doc.md", content: `${HEADER}only body line\n` }]);
+    expect(numberedLines(combined)).toEqual([[7, "only body line"]]);
+  });
+
+  it("still shows a real empty last line", () => {
+    const shown = numberedLines(budgetAndNumberSource("doc.md", `${HEADER}body line\n\n`));
+    expect(shown).toEqual([[7, "body line"], [8, ""]]);
+  });
+
+  it("still numbers a body without a final newline to its last line", () => {
+    expect(numberedLines(budgetAndNumberSource("doc.md", RAW)).at(-1)).toEqual([8, "second body line"]);
+  });
+});

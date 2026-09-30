@@ -128,6 +128,10 @@ export function buildBudgetedCombinedContent(
  */
 function numberLines(content: string, firstLine: number): string {
   const lines = content.split("\n");
+  // A final newline ends the last line; it does not start another. Numbering the
+  // empty tail that split() leaves would show the model a line the file does not
+  // have, and the model cites what it is shown.
+  if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
   const width = String(firstLine + lines.length - 1).length;
   return lines
     .map((line, i) => `${String(firstLine + i).padStart(width)} | ${line}`)
