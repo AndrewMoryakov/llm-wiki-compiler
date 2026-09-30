@@ -50,7 +50,7 @@ llmwiki is **not** a general static-site generator, a heavy ontology database, o
 - **Citation-traceable output** — paragraphs and claims cite source files and line ranges, and `llmwiki lint` validates the links.
 - **Configurable Lifecycle Profiles** — a fail-closed `.llmwiki/profile.json` declares entity schemas, relations, lifecycle gates, workflows, and retrieval policy; see [CLP](#configurable-lifecycle-profiles-clp).
 - **Hybrid retrieval** — semantic chunk search, BM25 reranking, and wikilink graph expansion build compact evidence packs for queries and agents.
-- **Review policy and freshness repair** — risky generated pages are held for review; stale pages are surfaced and repaired with `llmwiki refresh --stale`.
+- **Review policy and freshness repair** — with `compile --review` or a review policy in `.llmwiki/config.json`, risky generated pages are held for review (by default nothing is held); stale pages are surfaced and repaired with `llmwiki refresh --stale`.
 - **Local viewer, MCP server, SDK** — `llmwiki view`, `llmwiki serve`, and `createWiki({ root })` cover humans, agents, and TypeScript code.
 - **Open Knowledge Format exchange** — portable, markdown-native import/export, plus JSON, JSON-LD, GraphML, Marp, and `llms.txt`.
 - **Provider portable** — Anthropic, Claude Agent SDK local login, OpenAI-compatible servers, Ollama, GitHub Copilot, Atlas Cloud, and local OpenAI-compatible runtimes.
@@ -84,7 +84,7 @@ llmwiki is **not** a general static-site generator, a heavy ontology database, o
 
 1. **Ingest.** `llmwiki ingest <url-or-file>` fetches a URL or copies a local file into `sources/`.
 2. **Compile once.** `llmwiki compile` extracts concepts and then writes typed pages (`concept`, `entity`, `comparison`, `overview`) with cited source files and line ranges. Only changed sources flow through the LLM again.
-3. **Review and check.** Risky pages can be held for review; `llmwiki lint` and `llmwiki eval` check links, citations, freshness, and quality.
+3. **Review and check.** With `--review` or a configured policy, risky pages are held for review; `llmwiki lint` and `llmwiki eval` check links, citations, freshness, and quality.
 4. **Ask and reuse.** Query from the CLI, open the local viewer, serve it over MCP, use the SDK, or export to other formats.
 
 The key shift is moving work from query time to compile time — see [Karpathy's LLM Wiki pattern](#karpathys-llm-wiki-pattern).
