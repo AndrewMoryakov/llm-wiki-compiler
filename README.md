@@ -1,35 +1,62 @@
-# llmwiki
+<p align="center">
+  <img src="docs/images/llm-wiki-compiler-hero.png" alt="llm-wiki-compiler: an owl scribe at a desk turns a row of raw PDF, Markdown, text and web sources into a linked, cited wiki that a librarian keeps, for humans and AI agents to ask questions" width="100%">
+</p>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/atomicstrata/llm-wiki-compiler/ci.yml?branch=main&logo=github&label=CI)](https://github.com/atomicstrata/llm-wiki-compiler/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/llm-wiki-compiler?logo=npm&label=npm)](https://www.npmjs.com/package/llm-wiki-compiler)
-[![docs](https://img.shields.io/badge/docs-llmwiki.atomicstrata.ai-blue)](https://llmwiki.atomicstrata.ai)
-[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+<h1 align="center">llm-wiki-compiler</h1>
 
-> **New in 1.0:** Configurable Lifecycle Profiles turn llmwiki into a reusable domain knowledge substrate. Declare typed entities, relations, lifecycle gates, workflows, artifacts, connectors, and retrieval policy in one validated profile. Start with the built-in `autosci` research pack or the deliberately different `newsroom` editorial pack, or install a local declarative template.
+<p align="center"><b>Compile raw sources into an interlinked, citation-traceable markdown wiki — for people and AI agents who need durable knowledge, not loose files.</b></p>
 
----
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <a href="package.json"><img alt="Node.js 24+" src="https://img.shields.io/badge/node-%3E%3D24-339933.svg?logo=nodedotjs&logoColor=white"></a>
+  <a href="tsconfig.json"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6.svg?logo=typescript&logoColor=white"></a>
+  <a href="https://www.npmjs.com/package/llm-wiki-compiler"><img alt="npm package: llm-wiki-compiler" src="https://img.shields.io/badge/npm-llm--wiki--compiler-CB3837.svg?logo=npm&logoColor=white"></a>
+  <a href="https://llmwiki.atomicstrata.ai"><img alt="docs: llmwiki.atomicstrata.ai" src="https://img.shields.io/badge/docs-llmwiki.atomicstrata.ai-blue"></a>
+</p>
 
-## What llmwiki does
+<p align="center"><b>English</b> | <a href="README.ru.md">Русский</a></p>
 
-Compile raw sources into an interlinked, citation-traceable markdown wiki that agents and humans can browse, query, lint, export, and reuse. The default profile preserves the classic concepts-and-queries layout; optional profiles add domain-specific types and workflows without adding domain branches to the compiler.
+> Fork of [atomicstrata/llm-wiki-compiler](https://github.com/atomicstrata/llm-wiki-compiler). The upstream license and credits are unchanged. This fork's `main` may differ from the version published to npm.
+
+```bash
+npm install -g llm-wiki-compiler
+llmwiki quickstart ./notes.md      # ingest one source, compile pages, open the viewer
+llmwiki query "what are the key ideas?"
+```
+
+**llmwiki** (the CLI of this repo; npm package `llm-wiki-compiler`) compiles raw sources into an interlinked, citation-traceable markdown wiki that agents and humans can browse, query, lint, export, and reuse. The default profile preserves the classic concepts-and-queries layout; optional profiles add domain-specific types and workflows without adding domain branches to the compiler.
 
 llmwiki implements the [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) pattern: instead of re-discovering knowledge from raw files at query time, compile it once into durable pages that accumulate structure, provenance, review state, and retrieval metadata over time.
 
-![llmwiki demo](docs/images/demo.gif)
+> **New in 1.0:** Configurable Lifecycle Profiles turn llmwiki into a reusable domain knowledge substrate. Declare typed entities, relations, lifecycle gates, workflows, artifacts, connectors, and retrieval policy in one validated profile. Start with the built-in `autosci` research pack or the deliberately different `newsroom` editorial pack, or install a local declarative template.
 
-## When to use this repo
+## Why llmwiki?
 
-Use llmwiki when you need a persistent knowledge base from raw material:
+<a id="when-to-use-this-repo"></a>
 
-- Compile papers, notes, READMEs, transcripts, PDFs, images, or web pages into typed wiki pages.
-- Give agents a stable, citation-aware context pack instead of a pile of loose files.
-- Keep generated knowledge auditable with source citations, review queues, freshness checks, and quality gates.
-- Browse the result locally, query it from the CLI, expose it over MCP, or embed it through the SDK.
-- Exchange compiled knowledge with other tools using Open Knowledge Format (OKF), JSON, JSON-LD, GraphML, Marp, and `llms.txt`.
+- **If** you have papers, notes, READMEs, transcripts, PDFs, images, or web pages, **then** llmwiki compiles them into typed wiki pages instead of leaving them as a pile of loose files.
+- **If** you build agents, **then** it gives them a stable, citation-aware context pack instead of making them re-read raw files for every question.
+- **If** generated knowledge must stay auditable, **then** source citations, review queues, freshness checks, and quality gates are built in.
+- **If** you want to use the result your way, **then** browse it locally, query it from the CLI, expose it over MCP, or embed it through the SDK.
+- **If** you need to exchange compiled knowledge with other tools, **then** export and import Open Knowledge Format (OKF), JSON, JSON-LD, GraphML, Marp, and `llms.txt`.
 
-Do not use llmwiki as a general static-site generator, a heavy ontology database, or a replacement for ad-hoc search over fast-changing raw logs. It is strongest when source knowledge is worth compiling, reviewing, and reusing.
+llmwiki is **not** a general static-site generator, a heavy ontology database, or a replacement for ad-hoc search over fast-changing raw logs. It is strongest when source knowledge is worth compiling, reviewing, and reusing.
 
-## What you get
+## Features
+
+<a id="what-you-get"></a>
+
+- **Compiled wiki, not chunks** — a two-phase LLM pipeline extracts concepts, then generates typed pages: `concept`, `entity`, `comparison`, and `overview`.
+- **Citation-traceable output** — paragraphs and claims cite source files and line ranges, and `llmwiki lint` validates the links.
+- **Configurable Lifecycle Profiles** — a fail-closed `.llmwiki/profile.json` declares entity schemas, relations, lifecycle gates, workflows, and retrieval policy; see [CLP](#configurable-lifecycle-profiles-clp).
+- **Hybrid retrieval** — semantic chunk search, BM25 reranking, and wikilink graph expansion build compact evidence packs for queries and agents.
+- **Review policy and freshness repair** — risky generated pages are held for review; stale pages are surfaced and repaired with `llmwiki refresh --stale`.
+- **Local viewer, MCP server, SDK** — `llmwiki view`, `llmwiki serve`, and `createWiki({ root })` cover humans, agents, and TypeScript code.
+- **Open Knowledge Format exchange** — portable, markdown-native import/export, plus JSON, JSON-LD, GraphML, Marp, and `llms.txt`.
+- **Provider portable** — Anthropic, Claude Agent SDK local login, OpenAI-compatible servers, Ollama, GitHub Copilot, Atlas Cloud, and local OpenAI-compatible runtimes.
+
+<details>
+<summary>Full feature list</summary>
 
 - **Compiled wiki, not chunks.** A two-phase LLM pipeline extracts concepts, then generates typed pages: `concept`, `entity`, `comparison`, and `overview`.
 - **Configurable Lifecycle Profiles.** A fail-closed `.llmwiki/profile.json` can declare entity schemas, typed relations, lifecycle state machines, transition requirements, workflows, artifacts, connectors, content tiers, and retrieval policy.
@@ -46,6 +73,66 @@ Do not use llmwiki as a general static-site generator, a heavy ontology database
 - **Open Knowledge Format exchange.** Export and import OKF bundles for portable, markdown-native knowledge exchange. External OKF imports are staged through the review queue by default; trusted bundles can be written live explicitly.
 - **Other portable exports.** Export JSON, JSON-LD, GraphML, Marp slides, and `llms.txt` for downstream systems.
 - **Provider portable.** Anthropic, Claude Agent SDK local login, OpenAI-compatible servers, Ollama, GitHub Copilot, Atlas Cloud, and local OpenAI-compatible runtimes.
+
+</details>
+
+## How it works
+
+<p align="center">
+  <img src="docs/images/llm-wiki-compiler-how-it-works.png" alt="llm-wiki-compiler: several raw source files go through one LLM compile step that finds concepts and writes pages, producing a wiki of linked pages with citations that people and agents then query" width="100%">
+</p>
+
+1. **Ingest.** `llmwiki ingest <url-or-file>` fetches a URL or copies a local file into `sources/`.
+2. **Compile once.** `llmwiki compile` extracts concepts and then writes typed pages (`concept`, `entity`, `comparison`, `overview`) with cited source files and line ranges. Only changed sources flow through the LLM again.
+3. **Review and check.** Risky pages can be held for review; `llmwiki lint` and `llmwiki eval` check links, citations, freshness, and quality.
+4. **Ask and reuse.** Query from the CLI, open the local viewer, serve it over MCP, use the SDK, or export to other formats.
+
+The key shift is moving work from query time to compile time — see [Karpathy's LLM Wiki pattern](#karpathys-llm-wiki-pattern).
+
+## Quick start
+
+```bash
+npm install -g llm-wiki-compiler
+
+export ANTHROPIC_API_KEY=sk-...
+# or choose another provider:
+# export LLMWIKI_PROVIDER=openai
+# export OPENAI_API_KEY=sk-...
+
+llmwiki quickstart ./notes.md
+llmwiki query "what are the key ideas?"
+llmwiki view --open
+```
+
+`quickstart` ingests one source, compiles pages, and opens the viewer. Inside an existing project, run `llmwiki next` when you want the safest next action.
+
+To start with a domain model instead of the default concepts-and-queries layout:
+
+```bash
+mkdir research-wiki && cd research-wiki
+llmwiki template inspect autosci
+llmwiki template init autosci
+llmwiki profile validate
+llmwiki workflow list
+```
+
+Template installation is for a new or empty typed project. It materializes the chosen profile into `.llmwiki/profile.json`; normal project loading never depends on a template registry or lockfile.
+
+Detailed setup: [`docs/installation.mdx`](docs/installation.mdx) and [`docs/quickstart.mdx`](docs/quickstart.mdx).
+
+## Demo
+
+![llmwiki demo](docs/images/demo.gif)
+
+Try it on any article or document:
+
+```bash
+mkdir my-wiki && cd my-wiki
+llmwiki quickstart https://en.wikipedia.org/wiki/Andrej_Karpathy
+llmwiki query "What terms did Andrej coin?"
+```
+
+The [`examples/basic/`](examples/basic/) directory includes a small pre-generated wiki you can inspect without an API key.
 
 ## Configurable Lifecycle Profiles (CLP)
 
@@ -117,48 +204,6 @@ If an agent is scanning this README, these are the high-signal entry points:
 | Export for another system | `llmwiki export --target <format>` |
 | Export an Open Knowledge Format bundle | `llmwiki export --target okf --out <dir>` |
 | Import an Open Knowledge Format bundle | `llmwiki import --okf <dir> --dry-run`, then review/approve |
-
-## Quick start
-
-```bash
-npm install -g llm-wiki-compiler
-
-export ANTHROPIC_API_KEY=sk-...
-# or choose another provider:
-# export LLMWIKI_PROVIDER=openai
-# export OPENAI_API_KEY=sk-...
-
-llmwiki quickstart ./notes.md
-llmwiki query "what are the key ideas?"
-llmwiki view --open
-```
-
-`quickstart` ingests one source, compiles pages, and opens the viewer. Inside an existing project, run `llmwiki next` when you want the safest next action.
-
-To start with a domain model instead of the default concepts-and-queries layout:
-
-```bash
-mkdir research-wiki && cd research-wiki
-llmwiki template inspect autosci
-llmwiki template init autosci
-llmwiki profile validate
-llmwiki workflow list
-```
-
-Template installation is for a new or empty typed project. It materializes the chosen profile into `.llmwiki/profile.json`; normal project loading never depends on a template registry or lockfile.
-
-## Demo
-
-Try it on any article or document:
-
-```bash
-mkdir my-wiki && cd my-wiki
-llmwiki quickstart https://en.wikipedia.org/wiki/Andrej_Karpathy
-llmwiki query "What terms did Andrej coin?"
-```
-
-The [`examples/basic/`](examples/basic/) directory includes a small pre-generated wiki you can inspect without an API key.
-
 ## Core commands
 
 | Command | What it does |
@@ -380,7 +425,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE) (Copyright (c) 2026 atomicmemory, as stated in the license file). This fork keeps the upstream license and credits unchanged.
 
 ## Disclaimer
 
