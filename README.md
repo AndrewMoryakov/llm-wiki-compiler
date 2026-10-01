@@ -99,7 +99,7 @@ Status labels: unlabeled = implemented on this fork's `main`; **experimental** =
 
 ### Asking and using the wiki
 
-- **`query`.** Grounded answers. With an embedding index it retrieves chunks by embedding and BM25-reranks them; when there is no usable index, the model picks pages from the list of live pages instead (one extra provider call; there is no lexical search). Wikilink-graph expansion is not part of `query`; it belongs to `context`. `--save` turns an answer into a page. → [`docs/cli/query.mdx`](docs/cli/query.mdx)
+- **`query`.** Grounded answers. With an embedding index it retrieves chunks by embedding and BM25-reranks them; when the chunk search is unavailable or finds nothing, the model picks the pages instead (from the page-level embedding hits if there are any, otherwise from the list of live pages), which costs one extra provider call; there is no lexical search. Wikilink-graph expansion is not part of `query`; it belongs to `context`. `--save` turns an answer into a page. → [`docs/cli/query.mdx`](docs/cli/query.mdx)
 - **`context`.** A citation-aware evidence pack for an agent, as markdown or stable JSON. → [Agent decision guide](#agent-decision-guide)
 - **`view`.** A read-only local browser viewer with search, page metadata, graph exploration, freshness badges and citation chips; binds to loopback unless you opt in. → [`docs/cli/view.mdx`](docs/cli/view.mdx)
 - **`status`.** Page and source counts, stale and orphaned pages, pending work, review queue and state health, with `--json`. → [`docs/cli/status.mdx`](docs/cli/status.mdx)
