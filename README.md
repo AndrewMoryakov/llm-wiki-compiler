@@ -4,7 +4,7 @@
 
 <h1 align="center">llm-wiki-compiler</h1>
 
-<p align="center"><b>Compile raw sources into an interlinked, citation-traceable markdown wiki — for people and AI agents who need durable knowledge, not loose files.</b></p>
+<p align="center"><b>Compile raw sources into an interlinked, citation-traceable markdown wiki — then browse, query, review, lint, export and serve it to people and AI agents, with optional domain profiles for typed knowledge systems.</b></p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
@@ -28,7 +28,114 @@ llmwiki query "what are the key ideas?"
 
 llmwiki implements the [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) pattern: instead of re-discovering knowledge from raw files at query time, compile it once into durable pages that accumulate structure, provenance, review state, and retrieval metadata over time.
 
+Around the compiler the repository ships ingestion of several source types, incremental recompilation and stale-page repair, grounded queries and agent-ready context packs, a local read-only viewer, a review queue with an optional review policy, lint and an eval harness, an MCP server and a TypeScript SDK, Open Knowledge Format and other exports, several LLM providers, and Configurable Lifecycle Profiles (typed entities, relations, workflows, artifacts, connectors) with two built-in templates.
+
+It is early software, and not every surface is equally settled: the `workflow` commands are labelled experimental in the CLI help, the SDK's profile, workflow and artifact methods are marked `@experimental`, and a few items are still listed under *Unreleased* in the [changelog](CHANGELOG.md). See [Status and known limits](#status-and-known-limits).
+
 > **New in 1.0:** Configurable Lifecycle Profiles turn llmwiki into a reusable domain knowledge substrate. Declare typed entities, relations, lifecycle gates, workflows, artifacts, connectors, and retrieval policy in one validated profile. Start with the built-in `autosci` research pack or the deliberately different `newsroom` editorial pack, or install a local declarative template.
+
+**Contents:** [In plain words](#in-plain-words) · [What's inside](#whats-inside) · [Why llmwiki?](#why-llmwiki) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Profiles (CLP)](#configurable-lifecycle-profiles-clp) · [Agent decision guide](#agent-decision-guide) · [Core commands](#core-commands) · [Open Knowledge Format](#open-knowledge-format) · [What llmwiki creates](#what-llmwiki-creates) · [Agent integration](#agent-integration) · [Configuration](#configuration) · [Quality and safety](#quality-and-safety-model) · [Status and limits](#status-and-known-limits) · [Documentation](#documentation) · [Contributing](#contributing)
+
+## In plain words
+
+### The problem
+
+Notes, papers, READMEs, transcripts, PDFs and saved web pages pile up as loose files. Searching them means re-reading them, and asking an AI about them means sending the raw text again every time: nothing is remembered, related ideas in different files are never joined, and when an answer comes back you cannot easily tell which source it came from or whether that source has changed since.
+
+### Who it is for
+
+People and teams with a collection of sources worth turning into lasting knowledge — a research folder, codebase docs, a team handbook, standards, design notes, decision logs. People who build AI agents and want them to read one stable, cited context pack instead of the raw files. Advanced users can add review gates, quality thresholds for CI, a typed domain model (profiles), or embed the compiler through MCP or TypeScript.
+
+### What you get from it
+
+- **A wiki you can read as plain files.** Pages are markdown with YAML frontmatter under `wiki/`, linked with `[[wikilinks]]`; the layout can be opened as an Obsidian vault.
+- **Claims you can trace.** Pages cite source files and line ranges, and `llmwiki lint` checks that those citations and links resolve.
+- **Work done once.** Only new or changed sources go through the LLM again; stale pages are detected and can be repaired with a targeted recompile.
+- **Several ways to use it.** Ask questions from the CLI, browse in a local viewer, request a context pack for another agent, expose it over MCP, or call it from TypeScript.
+- **Control over generated content.** Hold risky pages in a review queue, run lint and an eval harness, and gate CI on thresholds.
+- **Portability.** Export to `llms.txt`, JSON, JSON-LD, GraphML, Marp and Open Knowledge Format; import OKF bundles (staged for review by default).
+- **An optional domain model.** A validated profile can declare typed entities, relations, lifecycle gates, workflows and artifacts, enforced by the write path.
+
+### What it is not
+
+- Not a general static-site generator, a heavy ontology database, or a replacement for plain search over fast-changing raw logs.
+- Not LLM-free: `compile`, `query` and other generation steps send content to the LLM provider you configure. Read-only commands (`lint`, `status`, the viewer, `eval` fast suite) need no provider.
+- Not infallible: pages are generated by a model, so review, lint and eval exist for a reason. The viewer is read-only, and MCP workflow actions are hard-capped below trusted writes and cannot satisfy human gates.
+- Not a hosted service: it runs on your machine against files in your project.
+- Not equally mature everywhere: see the status labels below.
+
+### Glossary
+
+| Term | Meaning here |
+|---|---|
+| **Source** | A raw input file under `sources/` — an ingested URL, PDF, image description, transcript, markdown or text file, or an agent session export. |
+| **Compile** | The two-phase LLM step that extracts concepts from changed sources and then writes wiki pages. |
+| **Wiki page** | A compiled markdown page under `wiki/`, with a kind: `concept`, `entity`, `comparison` or `overview`. |
+| **Citation** | A marker such as `^[paper.md:42-58]` tying a claim to a source file and line range. |
+| **Stale / orphaned** | A page is *stale* when a source it came from has changed, and *orphaned* when every source it came from was deleted. |
+| **Review candidate** | A generated page held under `.llmwiki/candidates/` until you approve or reject it. |
+| **Review policy** | An optional `.llmwiki/config.json` rule set that holds only risky pages. With no policy, nothing is held. |
+| **Context pack** | A compact, citation-aware evidence bundle built from the wiki for one task or question. |
+| **Profile (CLP)** | A validated `.llmwiki/profile.json` that declares typed entities, relations, lifecycle gates, workflows and retrieval policy. |
+| **OKF** | Open Knowledge Format: a portable, markdown-native way to exchange compiled knowledge. |
+| **MCP** | Model Context Protocol: how agents call llmwiki's tools over stdio. |
+
+## What's inside
+
+Status labels: unlabeled = implemented on this fork's `main`; **experimental** = marked experimental in the CLI help or the SDK types; **unreleased** = listed under *Unreleased* in [CHANGELOG.md](CHANGELOG.md), i.e. not in the latest release the changelog records (1.1.0).
+
+### Getting sources in
+
+- **`ingest`.** Fetches a URL (web pages, Wikipedia, arXiv, YouTube transcripts) or reads a local file (PDF, image, transcript, markdown or text) into `sources/`; very long content is truncated and flagged. → [Core commands](#core-commands), [`docs/cli/ingest.mdx`](docs/cli/ingest.mdx)
+- **`ingest-session`.** Imports Claude, Codex or Cursor session exports. → [`docs/cli/ingest.mdx`](docs/cli/ingest.mdx)
+- **`quickstart`, `next`, `watch`.** One-step ingest and compile with a viewer handoff; a read-only recommendation of the next action; automatic recompile when `sources/` changes. → [Quick start](#quick-start)
+- **`rm <source>`** (**unreleased**). Deletes a source and the concept pages derived only from it (typed entity pages of a non-default profile are left untouched and must be removed by hand), with a `--dry-run` preview. → [Core commands](#core-commands)
+
+### Compiling
+
+- **Two-phase compile.** Extract concepts from changed sources, then generate typed pages with citations and wikilinks; unchanged sources are not sent to the LLM again. Concurrency is configurable. → [How it works](#how-it-works), [`docs/concepts/how-it-works.mdx`](docs/concepts/how-it-works.mdx)
+- **`refresh --stale`, `recover`.** `refresh --stale` recompiles the changed sources that own stale pages, without compiling unrelated new sources; pages whose sources were all deleted are only cleaned up (marked orphaned), with no recompile and no LLM call, because no owner is left. `recover` reverts the journal of a crashed compile. → [Quality and safety model](#quality-and-safety-model)
+- **Language and layout.** `--lang` sets the output language; a generated `wiki/index.md` and a `wiki/MOC.md` Map of Content for Obsidian-style browsing. → [What llmwiki creates](#what-llmwiki-creates)
+
+### Asking and using the wiki
+
+- **`query`.** Grounded answers. With an embedding index it retrieves chunks by embedding and BM25-reranks them; when the chunk search is unavailable or finds nothing, the model picks the pages instead (from the page-level embedding hits if there are any, otherwise from the list of live pages), which costs one extra provider call; there is no lexical search. Wikilink-graph expansion is not part of `query`; it belongs to `context`. `--save` turns an answer into a page. → [`docs/cli/query.mdx`](docs/cli/query.mdx)
+- **`context`.** A citation-aware evidence pack for an agent, as markdown or stable JSON. → [Agent decision guide](#agent-decision-guide)
+- **`view`.** A read-only local browser viewer with search, page metadata, graph exploration, freshness badges and citation chips; binds to loopback unless you opt in. → [`docs/cli/view.mdx`](docs/cli/view.mdx)
+- **`status`.** Page and source counts, stale and orphaned pages, pending work, review queue and state health, with `--json`. → [`docs/cli/status.mdx`](docs/cli/status.mdx)
+
+### Trust and quality
+
+- **Review queue.** `compile --review` holds every generated page; a review policy holds only risky ones (low confidence, contradicted, schema- or provenance-violating); `review list|show|approve|reject` processes the queue. With no policy and no `--review`, nothing is held. → [Quality and safety model](#quality-and-safety-model), [`docs/configuration/review-policy.mdx`](docs/configuration/review-policy.mdx)
+- **`lint`.** Deterministic, no-LLM checks for broken links and citations, duplicates, stale and orphaned pages, low confidence and cross-link rules. → [`docs/cli/lint-eval.mdx`](docs/cli/lint-eval.mdx)
+- **`eval`.** Health score, per-page health, graph health, citation coverage and precision, and (full suite) LLM-judged citation support, with history, cache and CI thresholds. → [`docs/guides/ci-quality-gates.mdx`](docs/guides/ci-quality-gates.mdx)
+- **`rules`.** Extract, review and export machine-actionable rule candidates for a downstream rule importer. → [`docs/cli/lint-eval.mdx`](docs/cli/lint-eval.mdx)
+- **State recovery.** `state reset --yes` backs up and resets `state.json`; invalid review config aborts compile instead of disabling review. → [`docs/troubleshooting/state-recovery.mdx`](docs/troubleshooting/state-recovery.mdx)
+
+### Agents and code
+
+- **MCP server.** `llmwiki serve` exposes tools for ingest, compile, query, page search and read, lint, status, eval, context packs, artifact verification, OKF export/import and workflow actions, plus `llmwiki://` resources. → [Agent integration](#agent-integration)
+- **SDK.** `createWiki({ root })` drives ingest, compile, query, search, pages, sources, status, lint, context, export, eval and OKF from TypeScript. Its profile, workflow and artifact methods are **experimental**. → [Agent integration](#agent-integration)
+
+### Exchange
+
+- **Export.** `llms.txt`, `llms-full.txt`, JSON, JSON-LD, GraphML and Marp by default; `okf` with `--target okf`. → [`docs/cli/export.mdx`](docs/cli/export.mdx)
+- **OKF import.** Review-first by default; `--trusted` writes live; `--dry-run` previews. → [Open Knowledge Format](#open-knowledge-format)
+
+### Domain profiles (CLP)
+
+- **Profiles and templates.** `.llmwiki/profile.json` declares typed entities, relations, lifecycle gates and retrieval; `profile init|show|validate|diff`; built-in `autosci` (research) and `newsroom` (editorial) templates, local templates, and signed template taps and publishing. → [Configurable Lifecycle Profiles](#configurable-lifecycle-profiles-clp)
+- **Workflows** (**experimental**). Declared stages, gates, outputs and actions, driven by `llmwiki workflow …`. → [`docs/cli/workflow.mdx`](docs/cli/workflow.mdx)
+- **Artifacts and connectors.** Hash-pinned artifacts (`artifact write|verify`) and first-party connectors (Crossref, opt-in) that stage external records as review candidates. → [`docs/cli/connector.mdx`](docs/cli/connector.mdx)
+
+### Providers
+
+- **Chat and tool calls.** Anthropic, Claude Agent SDK local login, OpenAI-compatible servers, Ollama, MiniMax, GitHub Copilot and Atlas Cloud (**unreleased**). → [Configuration](#configuration)
+- **Embeddings.** Served by the active provider where it has an embedding endpoint, or by a separate `LLMWIKI_EMBEDDING_PROVIDER` (**unreleased**). → [`docs/configuration/environment-variables.mdx`](docs/configuration/environment-variables.mdx)
+
+### Not built
+
+The repository states no roadmap items. Things it explicitly is not: a static-site generator, an ontology database, or a hosted service. Atomic Memory, the companion runtime-memory project, is a separate repository ([Companion](#companion-atomic-memory)).
 
 ## Why llmwiki?
 
@@ -49,7 +156,7 @@ llmwiki is **not** a general static-site generator, a heavy ontology database, o
 - **Compiled wiki, not chunks** — a two-phase LLM pipeline extracts concepts, then generates typed pages: `concept`, `entity`, `comparison`, and `overview`.
 - **Citation-traceable output** — paragraphs and claims cite source files and line ranges, and `llmwiki lint` validates the links.
 - **Configurable Lifecycle Profiles** — a fail-closed `.llmwiki/profile.json` declares entity schemas, relations, lifecycle gates, workflows, and retrieval policy; see [CLP](#configurable-lifecycle-profiles-clp).
-- **Hybrid retrieval** — semantic chunk search, BM25 reranking, and wikilink graph expansion build compact evidence packs for queries and agents.
+- **Hybrid retrieval** — `query` combines semantic chunk search with BM25 reranking; `context` builds compact evidence packs for agents from lexical ranking, semantic chunks (when embeddings exist) and wikilink-graph expansion.
 - **Review policy and freshness repair** — with `compile --review` or a review policy in `.llmwiki/config.json`, risky generated pages are held for review (by default nothing is held); stale pages are surfaced and repaired with `llmwiki refresh --stale`.
 - **Local viewer, MCP server, SDK** — `llmwiki view`, `llmwiki serve`, and `createWiki({ root })` cover humans, agents, and TypeScript code.
 - **Open Knowledge Format exchange** — portable, markdown-native import/export, plus JSON, JSON-LD, GraphML, Marp, and `llms.txt`.
@@ -63,7 +170,7 @@ llmwiki is **not** a general static-site generator, a heavy ontology database, o
 - **Installable domain templates.** `llmwiki template init autosci` creates a research project with papers, ideas, experiments, manuscripts, evidence artifacts, workflows, and Crossref import. `newsroom` demonstrates the same machinery for editorial work.
 - **Runtime trust gates.** Relation, evidence, artifact, and human/agent gates are enforced by the write path rather than left as prompt conventions; standing lint detects drift after the fact.
 - **Citation-traceable output.** Paragraphs and claims cite source files and line ranges, and `llmwiki lint` validates the links.
-- **Hybrid retrieval.** Semantic chunk search, BM25 reranking, and wikilink graph expansion build compact evidence packs for queries and agents.
+- **Hybrid retrieval.** `query` combines semantic chunk search with BM25 reranking; `context` builds compact evidence packs for agents from lexical ranking, semantic chunks (when embeddings exist) and wikilink-graph expansion.
 - **Local viewer.** `llmwiki view` opens a read-only browser UI with search, page metadata, graph exploration, source-freshness badges, and citation chips.
 - **Review policy.** Generated pages can be auto-held for review when confidence, contradiction, schema, or provenance rules trip.
 - **Freshness repair.** `llmwiki lint` and `llmwiki next` surface stale/orphaned pages; `llmwiki refresh --stale` repairs changed knowledge without compiling unrelated new sources.
@@ -191,7 +298,7 @@ If an agent is scanning this README, these are the high-signal entry points:
 | Import external records through a connector | `llmwiki connector list`, then `llmwiki connector run <id> --input key=value` |
 | Add more files or URLs | `llmwiki ingest <url-or-file>` |
 | Compile or recompile changed sources | `llmwiki compile` |
-| Remove a bad source and its derived pages | `llmwiki rm <source>` |
+| Remove a bad source and the concept pages derived only from it | `llmwiki rm <source>` |
 | Hold generated pages for human approval | `llmwiki compile --review` or review policy config |
 | Ask grounded questions | `llmwiki query "question"` |
 | Save an answer back into the wiki | `llmwiki query "question" --save` |
@@ -208,15 +315,19 @@ If an agent is scanning this README, these are the high-signal entry points:
 
 | Command | What it does |
 |---|---|
-| `llmwiki ingest <url-or-file>` | Fetch a URL or copy a local file into `sources/`. |
+| `llmwiki ingest <url-or-file>` | Fetch a URL (web page, Wikipedia, arXiv, YouTube transcript) or read a local file (PDF, image, transcript, markdown, text) into `sources/`. |
 | `llmwiki ingest-session <path>` | Import exported Claude, Codex, or Cursor sessions into `sources/`. |
 | `llmwiki quickstart <source>` | Ingest, compile, and optionally open the viewer in one step. |
-| `llmwiki compile` | Incrementally extract concepts and generate wiki pages. |
-| `llmwiki rm <source> [--dry-run]` | Delete a source and the concept pages derived exclusively from it. |
+| `llmwiki compile [--review] [--lang <code>] [--concurrency <n>]` | Incrementally extract concepts and generate wiki pages. |
+| `llmwiki watch` | Watch `sources/` and recompile when a source is added or changed. |
+| `llmwiki recover` | Recover an incomplete compile (revert a crashed compile's journal) without a full recompile. |
+| `llmwiki next [--json]` | Show the recommended next action for the project (read-only). |
+| `llmwiki rm <source> [--dry-run]` | Delete a source and the concept pages derived exclusively from it; typed entity pages of a non-default profile are left untouched and the command warns about them (unreleased). |
 | `llmwiki refresh --stale [--dry-run]` | Recompile changed owners of stale pages and clean selected orphaned ownership. |
-| `llmwiki template list\|inspect\|init` | Discover and install validated declarative profile templates. |
+| `llmwiki template list\|inspect\|init` | Discover and install validated declarative profile templates. Also `status`, `update`, `search`, `verify`, `tap ...` and `publish ...` for signed template distribution. |
+| `llmwiki schema init\|show` | Write or print the page-kind and cross-link schema (`.llmwiki/schema.json`). |
 | `llmwiki profile init\|show\|validate\|diff` | Create a minimal profile, inspect it, validate it, or assess profile changes. |
-| `llmwiki workflow ...` | Discover and drive profile-declared workflows, stages, gates, and outputs. |
+| `llmwiki workflow ...` | Discover and drive profile-declared workflows, stages, gates, and outputs (experimental). |
 | `llmwiki artifact write\|verify` | Write trusted profile-declared artifacts and verify hash-pinned references. |
 | `llmwiki connector list\|run` | Discover first-party connectors and stage external records for review. |
 | `llmwiki review list/show/approve/reject` | Inspect and manage held candidates. |
@@ -225,8 +336,10 @@ If an agent is scanning this README, these are the high-signal entry points:
 | `llmwiki view [--open]` | Start the read-only local browser viewer. |
 | `llmwiki status [--json]` | Report page/source counts, stale and orphaned pages, pending work, and state health. |
 | `llmwiki lint` | Validate wiki structure, citations, links, metadata, and freshness. |
-| `llmwiki eval [--suite fast\|full]` | Measure wiki quality and optional citation support. |
-| `llmwiki export --target <format>` | Export the wiki to portable formats, including Open Knowledge Format (`okf`). |
+| `llmwiki eval [--suite fast\|full]` | Measure wiki quality and optional citation support. Subcommands `report`, `history`, `judgements` and `cache` re-display, trend and manage past results. |
+| `llmwiki rules extract\|list\|approve\|reject\|export` | Extract, review and export machine-actionable rule candidates for a downstream rule importer. |
+| `llmwiki state reset --yes` | Back up and reset `.llmwiki/state.json` (recovery for a state written by a newer llmwiki version). |
+| `llmwiki export [--target <format>]` | Export the wiki to `llms-txt`, `llms-full-txt`, `json`, `json-ld`, `graphml` and `marp` (all of them without `--target`), or to Open Knowledge Format with `--target okf`. |
 | `llmwiki import --okf <dir> [--dry-run] [--trusted]` | Import an Open Knowledge Format bundle, staged for review by default. |
 | `llmwiki serve --root <dir>` | Start the MCP server. |
 
@@ -241,6 +354,8 @@ llmwiki export --target okf --out ./dist/okf
 llmwiki import --okf ./dist/okf --dry-run
 llmwiki import --okf ./dist/okf
 ```
+
+A plain `llmwiki export` does not write the OKF bundle; it is produced only with `--target okf`.
 
 OKF import is intentionally review-first: untrusted bundles become review candidates, not live wiki pages. The importer preserves foreign OKF metadata, stores llmwiki provenance under `x-llmwiki`, and re-exports imported pages honestly after local edits, including safe original nested paths.
 
@@ -285,7 +400,7 @@ Run:
 llmwiki serve --root /path/to/wiki-project
 ```
 
-MCP clients can ingest sources, compile, query, search pages, read pages, lint, run eval, inspect status, request context packs, and exchange OKF bundles. Read-only tools work without provider credentials; LLM-backed tools validate provider credentials at call time. The `run_eval` tool runs its fast suite without a provider; its full suite (which LLM-judges citation support) requires one.
+MCP clients can ingest sources, compile, query, search pages, read pages, lint, run eval, inspect status, request context packs, and exchange OKF bundles. The tools are `ingest_source`, `compile_wiki`, `query_wiki`, `search_pages`, `read_page`, `lint_wiki`, `wiki_status`, `get_context_pack`, `run_eval`, `verify_artifact`, `export_okf`, `import_okf`, `list_workflow_actions`, `describe_workflow_action`, `run_workflow_action` and `workflow_run_status`, alongside `llmwiki://` resources for the index, sources, state, concept and query pages and the eval report. MCP workflow actions are hard-capped at staged writes: they cannot perform trusted writes or satisfy human gates, and artifacts can be verified but not written over MCP. Read-only tools work without provider credentials; LLM-backed tools validate provider credentials at call time. The `run_eval` tool runs its fast suite without a provider; its full suite (which LLM-judges citation support) requires one.
 
 See [`docs/guides/mcp-agent-integration.mdx`](docs/guides/mcp-agent-integration.mdx).
 
@@ -299,6 +414,8 @@ await wiki.ingest({ source: "./notes.md" });
 await wiki.compile();
 const answer = await wiki.query({ question: "What changed?" });
 ```
+
+The core methods cover ingest, compile, query, search, pages, sources, status, lint, context packs, JSON export, eval and OKF import/export. The profile, workflow and artifact methods are marked `@experimental` in the SDK types, with a note that their shape may change in a future minor release.
 
 See [`docs/guides/sdk.mdx`](docs/guides/sdk.mdx).
 
@@ -321,7 +438,10 @@ Provider selection is environment-driven:
 | OpenAI-compatible | `LLMWIKI_PROVIDER=openai`, `OPENAI_API_KEY`, optional `OPENAI_BASE_URL` |
 | Ollama | `LLMWIKI_PROVIDER=ollama`, `OLLAMA_HOST` |
 | GitHub Copilot | `LLMWIKI_PROVIDER=copilot`, `GITHUB_TOKEN=$(gh auth token)` |
-| Atlas Cloud | `LLMWIKI_PROVIDER=atlascloud`, `ATLASCLOUD_API_KEY` |
+| MiniMax | `LLMWIKI_PROVIDER=minimax`, `MINIMAX_API_KEY` |
+| Atlas Cloud (unreleased) | `LLMWIKI_PROVIDER=atlascloud`, `ATLASCLOUD_API_KEY` |
+
+Embeddings come from the active provider where it has an embedding endpoint. `LLMWIKI_EMBEDDING_PROVIDER` (`anthropic`, `claude-agent`, `openai` or `ollama`) selects a separate embedding backend (unreleased). `anthropic` and `claude-agent` embeddings go through Voyage and need `VOYAGE_API_KEY`; Atlas Cloud, MiniMax and GitHub Copilot have no embedding endpoint wired up here. Changing the embedding backend invalidates the embedding index, and the next `llmwiki compile` re-embeds every page. Without embeddings, `context` falls back to lexical ranking, while `query` falls back to asking the model to pick pages from the list of live pages (an extra provider call, not a lexical search).
 
 See [`docs/configuration/providers.mdx`](docs/configuration/providers.mdx) and [`docs/configuration/environment-variables.mdx`](docs/configuration/environment-variables.mdx).
 
@@ -347,14 +467,28 @@ llmwiki is still early software, but it is no longer a toy pipeline for a handfu
 
 - **Incremental compilation** means unchanged sources do not flow back through the LLM.
 - **Parallel compile** runs concept extraction and page generation concurrently under a configurable cap (`--concurrency` / `LLMWIKI_COMPILE_CONCURRENCY`), cutting wall-clock on large compiles.
-- **Chunk-level embeddings** narrow large wikis before BM25 reranking and graph expansion.
+- **Chunk-level embeddings** narrow large wikis before BM25 reranking in `query` and graph expansion in `context`.
 - **Content-hash-aware embedding updates** avoid recomputing vectors for unchanged pages and chunks.
 - **Batch embedding** sends page and chunk vectors to the provider in batches rather than one request at a time, cutting latency on cold starts and large refreshes.
 - **Cached citation judgements** make repeated `eval --suite full` runs cheaper.
-- **Lexical fallback** keeps query/context workflows usable when the active provider has no embedding endpoint.
+- **Fallback without embeddings** keeps query and context usable when the active provider has no embedding endpoint: `context` ranks lexically, `query` has the model pick pages.
 - **Prompt budgeting and ingest truncation metadata** make large sources explicit instead of silently pretending they fit.
 
 The current sweet spot is a durable project or domain wiki: research folders, codebase docs, team handbooks, standards, design notes, decision logs, or curated source packs. The less ideal fit is a high-churn firehose where raw search is enough and compiled structure would go stale faster than it can be reviewed.
+
+## Status and known limits
+
+llmwiki is early software, published to npm at 1.1.0. This fork's `main` may differ from that release, so check [`CHANGELOG.md`](CHANGELOG.md).
+
+- **Experimental surfaces.** The `workflow` command group is labelled experimental in the CLI help. The SDK's profile, workflow and artifact methods are marked `@experimental` and may change shape in a minor release.
+- **Unreleased on `main`.** `llmwiki rm`, the Atlas Cloud provider and `LLMWIKI_EMBEDDING_PROVIDER` are listed under *Unreleased* in the changelog.
+- **Runtime.** Node.js 24 or newer.
+- **The provider sees your sources.** `compile`, `query` and the other LLM-backed steps send content to the provider you configure. Ingested content longer than 100,000 characters is truncated, and the saved file records that it is partial.
+- **Embeddings depend on the provider.** MiniMax, GitHub Copilot and Atlas Cloud expose no embedding endpoint here; route embeddings elsewhere with `LLMWIKI_EMBEDDING_PROVIDER`, or `context` falls back to lexical ranking and `query` to an LLM page pick.
+- **Review is off by default.** With no `--review` and no review policy, every generated page is written live. `llmwiki query --save` is not gated by the review policy.
+- **Freshness costs time.** `status` computes freshness by re-hashing sources, so its runtime grows with the size of `sources/`.
+- **CI thresholds.** `citation_support_mean` in `.llmwiki/eval/thresholds.yaml` is only evaluated by the full eval suite.
+- **Where it fits.** A durable project or domain wiki; less so a high-churn firehose where raw search is enough and compiled structure would go stale faster than it can be reviewed.
 
 ## Documentation
 
@@ -375,6 +509,9 @@ The full docs site source is in [`docs/`](docs/):
 - MCP integration: [`docs/guides/mcp-agent-integration.mdx`](docs/guides/mcp-agent-integration.mdx)
 - SDK: [`docs/guides/sdk.mdx`](docs/guides/sdk.mdx)
 - Atomic Memory bridge: [`docs/guides/atomic-memory-bridge.mdx`](docs/guides/atomic-memory-bridge.mdx)
+- Providers and environment variables: [`docs/configuration/providers.mdx`](docs/configuration/providers.mdx), [`docs/configuration/environment-variables.mdx`](docs/configuration/environment-variables.mdx)
+- Review policy and CI quality gates: [`docs/configuration/review-policy.mdx`](docs/configuration/review-policy.mdx), [`docs/guides/ci-quality-gates.mdx`](docs/guides/ci-quality-gates.mdx)
+- Troubleshooting: [`docs/troubleshooting/faq.mdx`](docs/troubleshooting/faq.mdx), [`docs/troubleshooting/stale-pages.mdx`](docs/troubleshooting/stale-pages.mdx), [`docs/troubleshooting/state-recovery.mdx`](docs/troubleshooting/state-recovery.mdx)
 
 Preview the docs locally with Node 24:
 
