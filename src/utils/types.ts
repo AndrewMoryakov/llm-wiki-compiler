@@ -77,6 +77,14 @@ export interface ExtractedConcept extends ProvenanceMetadata {
   summary: string;
   is_new: boolean;
   tags?: string[];
+  /**
+   * Slug of the existing wiki page this concept belongs to, as named by the
+   * model from the index it was shown. Only with target pages enabled
+   * ({@link TARGET_PAGES_ENV}), and only when the slug is one the index lists:
+   * anything else is dropped at extraction. A label for the caller; the
+   * compiler does not merge on it.
+   */
+  updates?: string;
 }
 
 /** Per-source entry in .llmwiki/state.json. */

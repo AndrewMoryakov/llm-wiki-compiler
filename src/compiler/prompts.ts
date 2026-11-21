@@ -36,6 +36,19 @@ function withLangLine(...lines: string[]): string[] {
  */
 export const PROMPT_VERSION = "v1";
 
+/**
+ * Environment switch for target pages. When it is "1", the extraction tool
+ * gains an `updates` field and the prompt asks the model to name, for a concept
+ * an existing page already covers, that page's slug from the index. Off by
+ * default: the schema and the prompt are then byte-identical to before.
+ */
+export const TARGET_PAGES_ENV = "LLMWIKI_TARGET_PAGES";
+
+/** True when target pages are switched on for this process. */
+export function targetPagesEnabled(): boolean {
+  return process.env[TARGET_PAGES_ENV] === "1";
+}
+
 /** Allowed provenance state strings emitted by the LLM tool schema. */
 const PROVENANCE_STATE_VALUES: ProvenanceState[] = [
   "extracted",
@@ -119,10 +132,19 @@ export const CONCEPT_EXTRACTION_TOOL = {
 export function buildExtractionPrompt(
   sourceContent: string,
   existingIndex: string,
+  targetPages = false,
 ): string {
   const indexSection = existingIndex
     ? `\n\nHere is the existing wiki index — avoid duplicating concepts already covered:\n\n${existingIndex}`
     : "\n\nNo existing wiki pages yet.";
+  const targetSection = targetPages && existingIndex
+    ? [
+      "",
+      "When a concept is already covered by a page of this index, set is_new to false",
+      "and set `updates` to that page's slug, copied exactly as it stands inside [[...]]",
+      "before the | sign. Leave `updates` empty for a new concept.",
+    ].join("\n")
+    : "";
 
   return [
     ...withLangLine(
@@ -141,7 +163,7 @@ export function buildExtractionPrompt(
     "    or 'ambiguous' if the source is contradictory or unclear.",
     "  - contradicted_by: slugs of other concepts (in this batch or the index)",
     "    whose evidence conflicts with this one.",
-    indexSection,
+    indexSection + targetSection,
     "\n\n--- SOURCE DOCUMENT ---\n\n",
     sourceContent,
   ].join("\n");
@@ -212,6 +234,7 @@ interface RawConcept {
   confidence?: unknown;
   provenance_state?: unknown;
   contradicted_by?: unknown;
+  updates?: unknown;
 }
 
 /** True if the raw concept has the required string/boolean fields. */
@@ -253,7 +276,70 @@ function mapRawConcept(c: RawConcept): ExtractedConcept {
     confidence: typeof c.confidence === "number" ? c.confidence : undefined,
     provenanceState: provenance,
     contradictedBy: coerceContradictedBy(c.contradicted_by),
+    ...(typeof c.updates === "string" && c.updates.trim().length > 0 ? { updates: c.updates.trim() } : {}),
   };
+}
+
+/**
+ * The extraction tool for this run: the plain tool, or with target pages on,
+ * a copy whose concepts also carry `updates`.
+ */
+export function conceptExtractionTool(targetPages: boolean): typeof CONCEPT_EXTRACTION_TOOL {
+  if (!targetPages) return CONCEPT_EXTRACTION_TOOL;
+  const items = CONCEPT_EXTRACTION_TOOL.input_schema.properties.concepts.items;
+  return {
+    ...CONCEPT_EXTRACTION_TOOL,
+    input_schema: {
+      ...CONCEPT_EXTRACTION_TOOL.input_schema,
+      properties: {
+        concepts: {
+          ...CONCEPT_EXTRACTION_TOOL.input_schema.properties.concepts,
+          items: {
+            ...items,
+            properties: {
+              ...items.properties,
+              updates: {
+                type: "string",
+                description:
+                  "Slug of the existing wiki page this concept belongs to, copied exactly from the index; empty for a new concept.",
+              },
+            },
+          },
+        },
+      },
+    },
+  } as typeof CONCEPT_EXTRACTION_TOOL;
+}
+
+/** Slugs the wiki index links to, as `[[slug|Title]]` or `[[slug]]`. */
+export function indexSlugs(existingIndex: string): Set<string> {
+  const slugs = new Set<string>();
+  for (const match of existingIndex.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)) {
+    slugs.add(match[1].trim());
+  }
+  return slugs;
+}
+
+/**
+ * Keep each concept's `updates` only when it names a page the index lists.
+ * Returns the concepts with invalid targets cleared and the targets dropped,
+ * so the caller can say so. With target pages off every `updates` is cleared.
+ */
+export function resolveTargetPages(
+  concepts: ExtractedConcept[],
+  existingIndex: string,
+  targetPages: boolean,
+): { concepts: ExtractedConcept[]; dropped: Array<{ concept: string; updates: string }> } {
+  const live = targetPages ? indexSlugs(existingIndex) : new Set<string>();
+  const dropped: Array<{ concept: string; updates: string }> = [];
+  const resolved = concepts.map((c) => {
+    if (c.updates === undefined) return c;
+    if (live.has(c.updates)) return c;
+    if (targetPages) dropped.push({ concept: c.concept, updates: c.updates });
+    const { updates: _dropped, ...rest } = c;
+    return rest;
+  });
+  return { concepts: resolved, dropped };
 }
 
 /**

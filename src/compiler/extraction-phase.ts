@@ -18,9 +18,11 @@ import {
 } from "./confined-wiki-read.js";
 import { callClaude } from "../utils/llm.js";
 import {
-  CONCEPT_EXTRACTION_TOOL,
   buildExtractionPrompt,
+  conceptExtractionTool,
   parseConcepts,
+  resolveTargetPages,
+  targetPagesEnabled,
 } from "./prompts.js";
 import { sourceBody } from "./prompt-budget.js";
 import {
@@ -149,12 +151,17 @@ async function extractConcepts(
   existingIndex: string,
 ): Promise<ExtractedConcept[]> {
   // Only the body: frontmatter is producer metadata, not something to extract from.
-  const system = buildExtractionPrompt(sourceBody(sourceContent).text, existingIndex);
+  const targetPages = targetPagesEnabled();
+  const system = buildExtractionPrompt(sourceBody(sourceContent).text, existingIndex, targetPages);
   const rawOutput = await callClaude({
     system,
     messages: [{ role: "user", content: "Extract the key concepts from this source." }],
-    tools: [CONCEPT_EXTRACTION_TOOL],
+    tools: [conceptExtractionTool(targetPages)],
   });
 
-  return parseConcepts(rawOutput);
+  const { concepts, dropped } = resolveTargetPages(parseConcepts(rawOutput), existingIndex, targetPages);
+  for (const miss of dropped) {
+    output.status("!", output.warn(`  "${miss.concept}" named page "${miss.updates}", which the index does not list; treated as new`));
+  }
+  return concepts;
 }
