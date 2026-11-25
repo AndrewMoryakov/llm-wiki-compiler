@@ -140,12 +140,13 @@ export function buildExtractionPrompt(
   const targetSection = targetPages && existingIndex
     ? [
       "",
-      "Many concepts will belong on a page this index already has: a page about the",
-      "same subject that the concept adds to, updates, corrects or narrows, even when",
-      "that page does not mention the concept's detail yet. For such a concept, set",
-      "`updates` to that page's slug, copied exactly as it stands inside [[...]] before",
-      "the | sign, and set is_new to false. Leave `updates` empty only when no page of",
-      "the index is about the concept's subject.",
+      "A concept belongs on a page of this index when it is about that page's own",
+      "subject, so that a reader of the page would expect to find it there: it adds to,",
+      "updates, corrects or narrows what the page is about, even when the page does not",
+      "mention this detail yet. For such a concept, set `updates` to that page's slug,",
+      "copied exactly as it stands inside [[...]] before the | sign, and set is_new to",
+      "false. A concept that is only related to a page, uses one of its terms or shares",
+      "its general area does not belong on it; leave `updates` empty for it.",
     ].join("\n")
     : "";
 
@@ -304,7 +305,7 @@ export function conceptExtractionTool(targetPages: boolean): typeof CONCEPT_EXTR
               updates: {
                 type: "string",
                 description:
-                  "Slug of the existing wiki page whose subject this concept adds to, copied exactly from the index; empty only when no page is about its subject.",
+                  "Slug of the existing wiki page whose own subject this concept is about, copied exactly from the index; empty when the concept is only related to a page.",
               },
             },
           },
