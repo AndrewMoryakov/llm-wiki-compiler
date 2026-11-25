@@ -39,7 +39,7 @@ export const PROMPT_VERSION = "v1";
 /**
  * Environment switch for target pages. When it is "1", the extraction tool
  * gains an `updates` field and the prompt asks the model to name, for a concept
- * an existing page already covers, that page's slug from the index. Off by
+ * whose subject an existing page is about, that page's slug from the index. Off by
  * default: the schema and the prompt are then byte-identical to before.
  */
 export const TARGET_PAGES_ENV = "LLMWIKI_TARGET_PAGES";
@@ -140,9 +140,12 @@ export function buildExtractionPrompt(
   const targetSection = targetPages && existingIndex
     ? [
       "",
-      "When a concept is already covered by a page of this index, set is_new to false",
-      "and set `updates` to that page's slug, copied exactly as it stands inside [[...]]",
-      "before the | sign. Leave `updates` empty for a new concept.",
+      "Many concepts will belong on a page this index already has: a page about the",
+      "same subject that the concept adds to, updates, corrects or narrows, even when",
+      "that page does not mention the concept's detail yet. For such a concept, set",
+      "`updates` to that page's slug, copied exactly as it stands inside [[...]] before",
+      "the | sign, and set is_new to false. Leave `updates` empty only when no page of",
+      "the index is about the concept's subject.",
     ].join("\n")
     : "";
 
@@ -301,7 +304,7 @@ export function conceptExtractionTool(targetPages: boolean): typeof CONCEPT_EXTR
               updates: {
                 type: "string",
                 description:
-                  "Slug of the existing wiki page this concept belongs to, copied exactly from the index; empty for a new concept.",
+                  "Slug of the existing wiki page whose subject this concept adds to, copied exactly from the index; empty only when no page is about its subject.",
               },
             },
           },

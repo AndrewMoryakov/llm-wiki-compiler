@@ -43,7 +43,7 @@ describe("target pages", () => {
     const tool = conceptExtractionTool(true);
     expect(Object.keys(tool.input_schema.properties.concepts.items.properties)).toContain("updates");
     expect(tool.input_schema.properties.concepts.items.required).toEqual(["concept", "summary", "is_new"]);
-    expect(buildExtractionPrompt("body", INDEX, true)).toContain("set `updates` to that page's slug");
+    expect(buildExtractionPrompt("body", INDEX, true)).toContain("`updates` to that page's slug");
     expect(buildExtractionPrompt("body", "", true)).toBe(buildExtractionPrompt("body", ""));
   });
 
