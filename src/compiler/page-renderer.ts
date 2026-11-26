@@ -16,7 +16,7 @@ import {
 } from "../utils/markdown.js";
 import { readWikiPageContentOrWarn } from "./confined-wiki-read.js";
 import { callClaude } from "../utils/llm.js";
-import { buildPagePrompt } from "./prompts.js";
+import { buildPagePrompt, focusedPagesEnabled } from "./prompts.js";
 import { addObsidianMeta } from "./obsidian.js";
 import { addModelProvenanceMeta, addProvenanceMeta, reportContradictionWarnings } from "./provenance.js";
 import { normalizeCitationsInBody } from "./citation-normalize.js";
@@ -59,6 +59,7 @@ export async function renderMergedPageContent(
     entry.combinedContent,
     existingPage,
     relatedPages,
+    focusedPagesEnabled(),
   );
 
   const rawPageBody = await callClaude({

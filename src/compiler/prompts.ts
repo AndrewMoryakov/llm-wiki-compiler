@@ -44,6 +44,18 @@ export const PROMPT_VERSION = "v1";
  */
 export const TARGET_PAGES_ENV = "LLMWIKI_TARGET_PAGES";
 
+/**
+ * Environment switch for focused pages. When it is "1", the page prompt says the
+ * page is about its concept only: the source's other topics have their own pages
+ * and are linked, not retold. Off by default: the prompt is then byte-identical.
+ */
+export const FOCUSED_PAGES_ENV = "LLMWIKI_FOCUSED_PAGES";
+
+/** True when focused pages are switched on for this process. */
+export function focusedPagesEnabled(): boolean {
+  return process.env[FOCUSED_PAGES_ENV] === "1";
+}
+
 /** True when target pages are switched on for this process. */
 export function targetPagesEnabled(): boolean {
   return process.env[TARGET_PAGES_ENV] === "1";
@@ -187,6 +199,7 @@ export function buildPagePrompt(
   sourceContent: string,
   existingPage: string,
   relatedPages: string,
+  focused: boolean = false,
 ): string {
   const existingSection = existingPage
     ? `\n\nExisting page to update:\n\n${existingPage}`
@@ -194,6 +207,16 @@ export function buildPagePrompt(
 
   const relatedSection = relatedPages
     ? `\n\nRelated wiki pages for cross-referencing:\n\n${relatedPages}`
+    : "";
+
+  const focusSection = focused
+    ? [
+      "",
+      `This page is about "${concept}" only. Use only the parts of the source that are about it.`,
+      "The source's other topics have their own pages: link them with [[wikilinks]] instead of",
+      "retelling them, and do not retell the source's introduction, story or background.",
+      "Write as much as this concept needs and no more.",
+    ].join("\n")
     : "";
 
   return [
@@ -204,6 +227,7 @@ export function buildPagePrompt(
       "Suggest [[wikilinks]] to related concepts where appropriate.",
       "Write in a neutral, informative tone. Be concise but thorough.",
     ),
+    ...(focused ? [focusSection] : []),
     "",
     "Source attribution: at the end of each prose paragraph, append a citation",
     "marker identifying which source file(s) and line range the paragraph drew from.",
